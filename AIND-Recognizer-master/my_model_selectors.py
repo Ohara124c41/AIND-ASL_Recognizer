@@ -76,8 +76,25 @@ class SelectorBIC(ModelSelector):
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        optimal_score = float("inf")
+        optimal_model = None
+
+        for n in range(self.min_n_components, self.max_n_components+1):
+            try:
+                optimal_model = self.base_model(n)
+                log_L = model.score(self.X, self.lengths)
+                datum = SUM(self.lengths)
+                hyper = (n**2) + (2*n*datum) - 1
+                BIC = (-2*log_L) + (hyper*np.log10(datum))
+                if BIC < optimal_score:
+                    optimal_score = BIC
+                    optimal_model = updated_model
+
+            except:
+                pass
+
+        return optimal_model
+
 
 
 class SelectorDIC(ModelSelector):
@@ -93,8 +110,26 @@ class SelectorDIC(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        # Implement model selection based on DIC scores
+
+        ordered_pairs = [self.hwords[key] for key in self.hwords.keys() if key != self.this_word]
+        optimal_DIC = float("-inf")
+        optimal_model = None
+
+        for n in range(self.min_n_components, self.max_n_components +1):
+            try:
+                model = self.base_model(n)
+                log_L_X = model.score(self.X, self.lengths)
+                log_L_O = [model.score(X[0],X[1]) for X in [ord for ord in ordered_pairs]]
+                DIC = log_L_X - sum(log_L_O)/(len(log_L_O)-1)
+                if DIC > optimal_DIC:
+                    optimal_model = model
+                    optimal_DIC = DIC
+            except:
+                pass
+
+        return optimal_model
+
 
 
 class SelectorCV(ModelSelector):
@@ -105,5 +140,32 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        # Implement model selection using CV
+        split_method = KFold()
+        optimal_model = None
+        optimal_score = float("-inf")
+
+        for n in range(self.min_n_components, self.max_n_components+1):
+            SUM_score = 0
+            try:
+                if len(self.sequences) > 2:
+                    for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                        self.X, self.lengths = combine_sequences(cv_train_idx,self.sequences)
+                        X_test, length_test = combine_sequences(cv_test_idx,self.sequences)
+
+                        model = self.base_model(n)
+                        SUM_score += model.score(X_test,length_test)
+
+                    mean_score = SUM_score/3
+                else:
+                    model = self.base_model(n)
+                    mean_score = model.score(self.X, self.lengths)
+
+                if mean_score > optimal_score:
+                    optimal_score = mean_score
+                    optimal_model = model
+
+            except:
+                pass
+
+        return optimal_model
